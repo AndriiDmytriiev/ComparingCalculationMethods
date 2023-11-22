@@ -24,39 +24,84 @@ using static System.Net.Mime.MediaTypeNames;
 using System.Diagnostics;
 using Npgsql;
 {
-    
 
-    
-        Stopwatch sw = Stopwatch.StartNew();
-        Serial(10000);
+
+    //for (int i =0; i < 5; i++)
+    {     
+    Stopwatch sw = Stopwatch.StartNew();
+        int UpperCount = 10000;
+        Serial(UpperCount);
+        Console.WriteLine();
         Console.WriteLine("Serial: {0:f2} s", sw.Elapsed.TotalSeconds);
 
         sw = Stopwatch.StartNew();
-        ParallelFor(10000);
+
+        ParallelFor(UpperCount);
+        Console.WriteLine();
         Console.WriteLine("Parallel.For: {0:f2} s", sw.Elapsed.TotalSeconds);
 
-  
-
         sw = Stopwatch.StartNew();
-        CustomParallelExtractedMaxHalfParallelism(10000);
-        Console.WriteLine("Custom parallel (extracted max, half parallelism): {0:f2} s", sw.Elapsed.TotalSeconds);
 
-       
-   
+        CustomParallelExtractedMaxHalfParallelism(UpperCount);
+        Console.WriteLine();
+        Console.WriteLine("Custom parallel (extracted max, half parallelism): {0:f2} s", sw.Elapsed.TotalSeconds);
+    }
+
+
 }
+
+
+
+
+
 
 static void Serial(int j)
 {
-    for (int i = 0; i < j; i++)
+    List<Task> tasks = new List<Task>();
+    Object lockObj = new Object();
+    int outputItem = 0;
+    for (int tCtr = 0; tCtr <= 4; tCtr++)
     {
-        doStuff("test1");
-    }
-}
+        int iteration = tCtr;
+        Task t = Task.Run(() => {
 
+            for (int i = 0; i < (j / 5); i++)
+            {
+               
+                lock (lockObj)
+                {
+                    doStuff("Task" + i.ToString());
+                    //Console.Write("{0} in task t-{1} on thread {2}   ",
+                    //              i, iteration, Thread.CurrentThread.ManagedThreadId);
+                    //outputItem++;
+                    //if (outputItem % 3 == 0)
+                    //    Console.WriteLine();
+                }
+
+            }
+            
+
+        });
+        tasks.Add(t);
+    }
+
+    ExecuteJob(tasks.ToArray());
+
+
+
+   
+}
+ static async void ExecuteJob(Task[] test)
+{
+
+    await Task.WhenAll(test).ConfigureAwait(false);
+}
 static void ParallelFor(int j)
 {
     Parallel.For(
         0, j, i => { doStuff("test2"); });
+
+    
 }
 
  static NpgsqlConnection GetConnection()
@@ -138,7 +183,7 @@ static void CustomParallelExtractedMaxHalfParallelism(int j)
 
     for (int taskNumber = 0; taskNumber < degreeOfParallelism; taskNumber++)
     {
-        // capturing taskNumber in lambda wouldn't work correctly
+       
         int taskNumberCopy = taskNumber;
 
         tasks[taskNumber] = Task.Factory.StartNew(
